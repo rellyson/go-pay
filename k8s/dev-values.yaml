@@ -6,10 +6,15 @@ postgresql:
     database: go_pay_dev
 
 replicaCount: 1
+
 image:
-  repository: ${IMAGE}
+  repository: registry.localhost:5000/api
   pullPolicy: Always
   tag: latest
+
+deployment:
+  containerPort: 3000
+  healthCheckPath: "/healthcheck"
 
 service:
   type: ClusterIP
@@ -21,13 +26,9 @@ autoscaling:
   maxReplicas: 100
 
 serviceAccount:
-  # Specifies whether a service account should be created
   create: false
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
   name: ""
+  annotations: {}
 
 ingress:
   enabled: false
