@@ -1,0 +1,102 @@
+# https://devspace.sh/cli/docs/configuration/reference
+version: v1beta11
+
+# `vars` specifies variables which may be used as ${VAR_NAME} in devspace.yaml
+vars:
+  - name: IMAGE
+    value: registry.localhost:5000/api
+  - name: PG_SELECTOR
+    value: go-pay-postgresql
+
+# `images` specifies the images that needs to be used in the deployment
+images:
+  api:
+    image: ${IMAGE}
+    tags:
+      - latest
+    injectRestartHelper: true
+    dockerfile: ../Dockerfile
+    context: ../
+    build:
+      docker:
+        preferMinikube: false
+        options:
+          target: "dev"
+          buildArgs: {}
+
+# `deployments` tells DevSpace how to deploy this project
+deployments:
+  - name: go-pay
+    namespace: go-pay
+    # This deployment uses `helm` but you can also define `kubectl` deployments or kustomizations
+    helm:
+      # We are deploying this project with the Helm chart you provided
+      chart:
+        name: helm
+      componentChart: false
+      cleanupOnFail: true
+      # Under `values` we can define the values for this Helm chart used during `helm install/upgrade`
+      # You may also use `valuesFiles` to load values from files, e.g. valuesFiles: ["values.yaml"]
+      valuesFiles:
+        - ./dev-values.yaml
+
+# `dev` only applies when you run `devspace dev`
+dev:
+  # `dev.sync` configures a file sync between our Pods in k8s and your local project files
+  sync:
+    - name: apiSync
+      localSubPath: ../
+      imageSelector: ${IMAGE} # Select the Pod that runs our `${IMAGE}`
+      # `excludePaths` option expects an array of strings with paths that should not be synchronized between the
+      # local filesystem and the remote container filesystem. It uses the same syntax as `.gitignore`.
+      excludePaths:
+        - .git/
+        - bin/
+      onUpload:
+        restartContainer: true
+
+  #  `dev.open` opens the URL after dev command has been succesfully started
+  open:
+    - url: "https://0.0.0.0:3000/"
+
+  # `dev.autoReload` auto reload deployments and images when changes are detected
+  autoReload:
+    deployments:
+      - ./helm
+    images:
+      - ../Dockerfile
+
+  # `dev.ports` configures port forwarding between the container and local
+  ports:
+    - imageSelector: ${IMAGE}
+      forward:
+        - port: 3000
+          remotePort: 3000
+          bindAddress: "0.0.0.0"
+    - imageSelector: ${PG_SELECTOR}
+      forward:
+        - port: 5432
+          remotePort: 5432
+          bindAddress: "0.0.0.0"
+
+  # Since our Helm charts and manifests deployments are often optimized for production,
+  # DevSpace let's you swap out Pods dynamically to get a better dev environment
+  replacePods:
+    - imageSelector: ${IMAGE} # Select the Pod that runs our `${IMAGE}`
+      # Since the `${IMAGE}` used to start our main application pod may be distroless or not have any dev tooling, let's replace it with a dev-optimized image
+      # DevSpace provides a sample image here but you can use any image for your specific needs
+      replaceImage: loftsh/go:latest
+      # Besides replacing the container image, let's also apply some patches to the `spec` of our Pod
+      # We are overwriting `command` + `args` for the first container in our selected Pod, so it starts with `sleep 9999999`
+      # Using `sleep 9999999` as PID 1 (instead of the regular ENTRYPOINT), allows you to start the application manually
+      patches:
+        - op: replace
+          path: spec.containers[0].command
+          value:
+            - sleep
+        - op: replace
+          path: spec.containers[0].args
+          value:
+            - "9999999"
+        - op: remove
+          path: spec.containers[0].securityContext
