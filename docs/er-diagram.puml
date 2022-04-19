@@ -1,0 +1,49 @@
+@startuml entity-relationship-diagram
+
+' hide the spot
+hide circle
+
+entity "User" as user {
+  *id : uuid <<generated>>
+  --
+  *full_name: text
+  *email: text
+  *cpf: text
+  *birth_date: date
+  *password: string
+}
+
+entity "Wallet" as wallet {
+  *id: uuid <<generated>>
+  --
+  *balance: float
+  *type: string
+  *user_id: uuid <<FK>>
+}
+
+entity "Transaction" as ta {
+  *id: uuid <<generated>>
+  --
+  *value: float
+  *type: string
+  additional_info: object
+  *from: uuid <<FK>>
+  *to: uuid <<FK>>
+}
+
+entity "CreditCard" as creditcard {
+  *id: uuid <<generated>>
+  --
+  *limit: float
+  *card_number: string
+  *valid_until: date
+  *cvv: int
+  *user_id: uuid <<FK>>
+}
+
+user ||..|| wallet
+ta }o..|| wallet
+ta }o..|| creditcard
+creditcard ||..|| user
+
+@enduml
